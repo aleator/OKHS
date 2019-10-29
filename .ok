@@ -1,0 +1,9 @@
+ghcid -c'stack ghci OKHS:exe:OKHS-exe' # Run the exe in ghcid
+stack install # Install the binary so the ok-abbreviation will find it
+
+# Some greetings
+
+echo "hi" $1           # Say hello
+echo "bye" $1 $kissa   # Say bye
+# More commands
+ls -la
