@@ -44,6 +44,7 @@ extra-deps:
 - text-zipper-0.10.1@sha256:8b73a97a3717a17df9b0a722b178950c476ff2268ca5c583e99d010c94af849e,1471
 - word-wrap-0.4.1@sha256:f72233b383ef569c557bfd9812cbb8e306c415ce509082c0bd15ee51c0239ccc,1606
 - language-bash-0.8.0@sha256:2a7b0498c029f0e7c30d3b273897e32036a629ff9ffa5c92ec2f3a51f46af86f,1620
+- dhall-1.27.0@sha256:b522d6b534949e65771ed0179afc1488e4de2b185af5ed38e4806a6720db51bf,30519
 
 
 # Override default flag values for local packages and extra-deps
