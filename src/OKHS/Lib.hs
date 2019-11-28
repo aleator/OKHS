@@ -1,12 +1,11 @@
-{-#LANGUAGE TypeFamilies#-}
 {-#LANGUAGE StandaloneDeriving#-}
 {-#LANGUAGE FlexibleContexts#-}
+{-#LANGUAGE DerivingVia#-}
 {-#LANGUAGE DeriveGeneric#-}
 {-#LANGUAGE DeriveFunctor#-}
 {-#LANGUAGE DeriveFoldable#-}
 {-#LANGUAGE DeriveTraversable#-}
 {-#LANGUAGE DeriveAnyClass#-}
-{-#LANGUAGE DataKinds#-}
 module OKHS.Lib where
 
 import qualified Language.Bash.Parse           as Bash
@@ -22,58 +21,80 @@ import qualified Data.Sequence as Seq
 import           Data.Sequence (Seq)
 import           Data.Either
 import           Data.Char                      ( isSpace )
+import qualified Data.Map as Map
+import Data.Map (Map)
+import Numeric.Natural
 
 import           Data.List.NonEmpty             ( NonEmpty(..) )
-import           Flow
 import qualified Dhall
+import Limitations
+import OKHS.Types
+import Data.Validation
 
+-- <# TYPES #>
+newtype RawCommand = RawCommand {getRaw :: Bash.List}
+  deriving (Show,Eq)
+  deriving Bash.Pretty via Bash.List
 
-data Stage = Parsed | Raw deriving (Eq,Show)
+-- TODO. Substitute should work on contents of parametrizable
+data ParametrizableCommand = ACommand Unparametrized
+                           | Disgressions (NonEmpty Disgression) String
 
-type family BashContent (a :: Stage) where
-        BashContent Parsed = Bash.List
-        BashContent Raw    = String
+newtype Unparametrized = Unparametrized {getUnparametrized :: Bash.List}
+ deriving (Show,Eq)
+ deriving Bash.Pretty via Bash.List
 
-data OkCommand' a
-  = OkCommand {bash :: a, comment :: Text} 
-    deriving (Generic,Dhall.Interpret,Dhall.Inject,Functor,Foldable,Traversable)
+newtype FinalCommand = Final {getFinal :: Bash.List}
+ deriving (Show,Eq)
+ deriving Bash.Pretty via Bash.List
+ 
+type PerhapsRunnableCommand = OkCommand' ParametrizableCommand
 
-        
+validateOkSection
+  :: Traversable t
+  => OkSection' (t (OkCommand' RawCommand))
+  -> IO (OkSection' (t (OkCommand' ParametrizableCommand)))
+validateOkSection sect = traverse (traverse validateOkCommand) sect
 
-type OkCommand = OkCommand' Bash.List
+validateOkCommand :: OkCommand' RawCommand -> IO (OkCommand' ParametrizableCommand) --(Validation [Disgression] (Runnable (OkCommand' a)))
+validateOkCommand command = do
+   disgressions <- validateLimitations (limitations command) 
+   case disgressions of
+    [] -> pure (command{bash=command |> bash |> getRaw |> Unparametrized |> ACommand})
+    (x:xs) -> pure (command{bash=Disgressions (x:|xs) (renderBashPart command)})
 
-data OkSection' fa 
-  = OkSection {name :: Text
-              ,commands :: fa
-              ,documentation :: Maybe Text}
-    deriving (Generic,Functor,Foldable,Traversable,Dhall.Interpret,Dhall.Inject)
-
-type OkSection = OkSection' [OkCommand]
-
-
-renderOkCommand :: OkCommand -> Text
-renderOkCommand (OkCommand bash comment) 
-  = T.pack (Bash.prettyText bash)
+renderOkCommand :: (Bash.Pretty a ) => OkCommand' a -> Text
+renderOkCommand command 
+  = T.pack (Bash.prettyText (bash command))
     <> T.pack "  #" 
-    <> comment
+    <> comment command
 
-renderBashPart :: OkCommand -> String
-renderBashPart (OkCommand bash _) = Bash.prettyText bash
+renderBashPart :: (Bash.Pretty a ) => OkCommand' a -> String
+renderBashPart command = Bash.prettyText (bash command)
 
-renderCommentPart :: OkCommand -> Text
-renderCommentPart (OkCommand _ comment) = comment
+renderCommentPart :: OkCommand' a -> Text
+renderCommentPart = comment
 
-arguments bash =
-  [ n | p@(Bash.ParamSubst (Bash.Bare (Bash.Parameter n Nothing))) <- universeBi bash ]
+arguments :: Unparametrized -> [Text]
+arguments (Unparametrized bash) =
+  [ fromString n | p@(Bash.ParamSubst (Bash.Bare (Bash.Parameter n Nothing))) <- universeBi bash ]
 
-substituteNamedArgs :: Bash.List -> [(String, String)] -> Bash.List
-substituteNamedArgs bash args = rewriteBi subst bash
+
+-- substituteOkCommand
+--   :: [(Text, Text)]
+--   -> OkCommand' Un
+--   -> OkCommand' FinalCommand
+-- substituteOkCommand args = fmap (getRaw .> substituteNamedArgs args .> Final)
+
+substituteNamedArgs :: [(Text, Text)] -> Unparametrized -> FinalCommand
+substituteNamedArgs args bash = rewriteBi subst (getUnparametrized bash) |> Final
  where
   subst :: Bash.Span -> Maybe Bash.Span
-  subst p@(Bash.ParamSubst (Bash.Bare (Bash.Parameter n Nothing))) = case lookup n args of
+  subst p@(Bash.ParamSubst (Bash.Bare (Bash.Parameter n Nothing))) = case lookup (T.pack n) args of
     Nothing  -> Nothing
-    Just str -> Just (Bash.Single (Bash.stringToWord str))
+    Just str -> Just (Bash.Single (Bash.stringToWord (T.unpack str)))
   subst _ = Nothing
+
 
 
 splitter [] = ("", "")
@@ -86,11 +107,11 @@ splitter (x : xs) = let (start, end) = splitter xs in (x : start, end)
 
 parseOkSection 
   :: OkSection' [OkCommand' Text] 
-  -> Either String (OkSection' [OkCommand' Bash.List])
+  -> Either String (OkSection' [OkCommand' RawCommand])
 parseOkSection =  traverse (traverse parseOkCommand)
 
 unparseOkSection :: 
-  OkSection' [OkCommand' Bash.List] ->  OkSection' [OkCommand' Text] 
+  OkSection' [OkCommand' RawCommand] ->  OkSection' [OkCommand' Text] 
 unparseOkSection = fmap (fmap unparseOkCommand)
 
 readOkSections :: Text -> [OkSection' [OkCommand' Text]]
@@ -114,33 +135,42 @@ readOkSections input =
 splitOkCommand :: Text -> OkCommand' Text
 splitOkCommand s =
   let (cmd, comment) = T.span (/= '#') s
-  in  OkCommand cmd (T.dropWhile (== '#') comment)
+  in  okCommand cmd (T.dropWhile (== '#') comment) 
 
-parseOkCommand :: OkCommand' Text -> Either String (OkCommand' Bash.List)
-parseOkCommand (OkCommand cmd comment) =
-  case Bash.parse "OKFile" (T.unpack cmd) of
+parseOkCommand :: OkCommand' Text -> Either String (OkCommand' RawCommand)
+parseOkCommand command  =
+  case Bash.parse "OKFile" (T.unpack (bash command)) of
         Left  err  -> Left (show err) 
-        Right list -> Right (OkCommand list comment)
+        Right list -> Right (command{bash=RawCommand list})
 
-unparseOkCommand :: OkCommand' Bash.List -> OkCommand' Text
-unparseOkCommand = fmap (Bash.prettyText .> T.pack)
+unparseOkCommand :: OkCommand' RawCommand -> OkCommand' Text
+unparseOkCommand = fmap (getRaw .> Bash.prettyText .> T.pack)
 
 parseBash :: String -> String -> Either String Bash.List
 parseBash src str =  Bash.parse src str |> either (Left . show) Right 
 
 data LZipper a = LZipper [a] a [a] deriving (Eq,Show)
+
 lzFromNonEmpty (x :| xs) = LZipper [] x xs
+
 lzToListWith :: (a -> b) -> (a -> b) -> (a -> b) -> LZipper a -> [b]
 lzToListWith front current back (LZipper x z y) =
   map front (reverse x) ++ [current z] ++ map back y
+
 lzCurrent :: LZipper a -> a
 lzCurrent (LZipper _ x _) = x
+
 lzToList (LZipper x z y) = reverse x ++ [z] ++ y
+
 lzLeft r@(LZipper []       z _) = r
 lzLeft (  LZipper (x : xs) z y) = LZipper xs x (z : y)
 
+lzIndex :: LZipper a -> Natural
+lzIndex (LZipper prefix _ _) = fromIntegral (length prefix)
+
 lzRight r@(LZipper _ z []      ) = r
 lzRight (  LZipper x z (y : ys)) = LZipper (z : x) y ys
+
 isRightmost lz = case lz of
   LZipper _ _ [] -> True
   other          -> False

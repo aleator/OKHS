@@ -1,45 +1,22 @@
-let cmd = (~/.config/OKHS/util).cmd
-in 
-[ { name =
-      ".ok"
-  , commands =
-      [ 
-      , cmd "ghcid"
-            "Run the lib in ghcid"
-      , cmd "ghcid -c'stack ghci OKHS:exe:OKHS-exe;'"
-            "Run the exe in ghcid"
-      , cmd "stack install;"
-            "Install the binary so the ok-abbreviation will find it"
-      ] 
-  , documentation =
-      Some ''
-        For some reason I can't figure
-        out how to get ghcid to watch both 
-        the library and the exe at the same time...
-      ''
-  }
-, { name =
-      "# Some greetings"
-  , commands =
-      [ { bash = "echo \"hi\" \$1;", comment = " Say hello" }
-      , { bash = "echo \"bye\" \$1 \$kissa;", comment = " Say bye" }
-      ] : List { bash : Text, comment : Text }
-  , documentation =
-      None Text
-  }
-, { name =
-      "# More commands"
-  , commands =
-      [ { bash = "ls -la;", comment = "" } ] : List
-                                               { bash : Text, comment : Text }
-  , documentation =
-      None Text
-  }
-] : List
-    { name :
-        Text
-    , commands :
-        List { bash : Text, comment : Text }
-    , documentation :
-        Optional Text
-    }
+let ok  = ~/.config/OKHS/util
+in  [   ok.section
+            "Building"
+            [ ok.cmd "ghcid" "Run the lib in ghcid"
+            , (~/.config/OKHS/Haskell).ghcid "OKHS" "OKHS-exe"
+            , ok.cmd
+                "stack install;"
+                "Install the binary so the ok-abbreviation will find it"
+            ]
+        ⫽ ok.docs
+            ''
+              For some reason I can't figure
+              out how to get ghcid to watch both 
+              the library and the exe at the same time...
+            ''
+      ,   ok.section "Tests"
+            [ok.cmd "echo $1 $2" "Echo out two things"
+                // ok.argDocs (toMap {`1`="The first Thing"
+                                     ,`2`="The second, less important thing"}) 
+            ]
+      ]  
+    : List ~/.config/OKHS/OKSection.type

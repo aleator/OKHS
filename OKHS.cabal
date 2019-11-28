@@ -20,12 +20,18 @@ source-repository head
 library
   exposed-modules:
       OKHS.Lib
+    -- , OKHS.Limitations
+    , OKHS.Types
+    , CmdArgs
+    , Prelude
   other-modules:
       Paths_OKHS
   hs-source-dirs:
       src
   build-depends:
-      base >=4.7 && <5
+      base-noprelude >=4.7 && <5
+    , relude >= 0.6
+    , Limitations
     , language-bash == 0.8.0
     , brick
     , uniplate
@@ -34,6 +40,11 @@ library
     , flow
     , dhall >= 1.27.0
     , text
+    , directory
+    , time
+    , validation
+    , pretty
+    , optparse-applicative
   default-language: Haskell2010
 
 executable OKHS-exe
@@ -45,7 +56,9 @@ executable OKHS-exe
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -static
   build-depends:
       OKHS
-    , base >=4.7 && <5
+    , Limitations
+    , base-noprelude >=4.7 && <5
+    , relude >= 0.6
     , language-bash
     , brick
     , uniplate
@@ -59,6 +72,9 @@ executable OKHS-exe
     , sqlite-simple
     , directory
     , dhall >= 1.27.0
+    , file-embed
+    , bytestring
+    , validation
   default-language: Haskell2010
 
 test-suite OKHS-test
@@ -71,7 +87,8 @@ test-suite OKHS-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       OKHS
-    , base >=4.7 && <5
+    , base-noprelude >=4.7 && <5
+    , relude >= 0.6
     , language-bash == 0.8.0
     , brick
     , uniplate
