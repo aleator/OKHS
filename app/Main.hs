@@ -46,7 +46,7 @@ import qualified Database.SQLite.Simple        as SQL
 import           System.Directory
 import qualified Dhall
 import qualified Dhall.Pretty                  as Dhall
-import CmdArgs
+import           CmdArgs
 
 
 ui :: ProgramState -> Widget Text
@@ -87,10 +87,13 @@ renderSelect lst = joinBorders
     Nothing   -> hBox (list : addConstraints) |> border
     Just docs -> border (list <+> vBox (docuWidget docs : addConstraints))
   addConstraints = case lst |> lzCurrent |> commands |> listSelectedElement of
-                        Nothing -> []
-                        Just (_,something) -> case bash something of
-                            Disgressions ds _ -> [toList ds |>map show |> unlines |> txt |> borderWithLabel (txt " Constraint violations ")]
-                            _ -> []
+    Nothing             -> []
+    Just (_, something) -> case bash something of
+      Disgressions ds _ ->
+        [ toList ds |> map show |> unlines |> txt |> borderWithLabel
+            (txt " Constraint violations ")
+        ]
+      _ -> []
   list       = (lst |> lzCurrent |> commands |> renderListWithIndex fun True)
   docuWidget = txt .> borderWithLabel (txt " Section docs ")
   labels =
@@ -106,7 +109,7 @@ renderSelect lst = joinBorders
       Disgressions _ commandString -> funAux
         i
         commandString
-        (renderCommentPart perhapsCommand<> " (disabled)")
+        (renderCommentPart perhapsCommand <> " (disabled)")
         cmdDisabledAttr
       ACommand s -> funAux i
                            (Bash.prettyText s)
@@ -136,7 +139,7 @@ handleSelect
   -> EventM Text (Next ProgramState)
 handleSelect theList ev = case ev of
   V.EvKey (V.KChar n) [] | isDigit n ->
-    let goTo = readMaybe [n] |> maybe 0 pred |> listMoveTo 
+    let goTo = readMaybe [n] |> maybe 0 pred |> listMoveTo
     in  changeCurrentCommand goTo theList |> Select |> continue --TODO: Auto-enter after this
   V.EvKey V.KRight [] -> theList |> lzRight |> Select |> continue
   V.EvKey V.KLeft  [] -> theList |> lzLeft |> Select |> continue
@@ -147,11 +150,15 @@ handleSelect theList ev = case ev of
         Select theList |> continue
       Just (cmdPos, selection@OkCommand { bash = ACommand cmd }) ->
         case arguments cmd of
-          [] -> substituteNamedArgs [] cmd |> Done (lzIndex theList, fromIntegral cmdPos) |> halt
+          [] ->
+            substituteNamedArgs [] cmd
+              |> Done (lzIndex theList, fromIntegral cmdPos)
+              |> halt
             -- halt (Done (substituteOkCommand [] promoted))
           (x : xs) ->
             (x :| xs)
-              |> mkEditor (lzIndex theList, fromIntegral cmdPos) selection { bash = cmd }
+              |> mkEditor (lzIndex theList, fromIntegral cmdPos)
+                          selection { bash = cmd }
               |> continue
   _ -> appCurrentCommand (handleListEvent ev) theList >>= Select .> continue
 
@@ -198,7 +205,7 @@ renderEditors cmd argDocs argEditors =
           Just doc -> editing <=> txt doc
   name x = txt (x <> ": ")
 
-type CmdPos = (Natural,Natural)
+type CmdPos = (Natural, Natural)
 
 handleEditor
   :: V.Event
@@ -216,8 +223,9 @@ handleEditor ev cmdPos cmd argDocs editors = case ev of
                ]
        in  bash cmd |> substituteNamedArgs filledInArgs |> Done cmdPos |> halt
     | otherwise
-    -> lzRight editors |> GetArgs cmdPos cmd argDocs |> continue 
-  V.EvKey V.KDown [] -> lzRight editors |> GetArgs cmdPos cmd argDocs |> continue
+    -> lzRight editors |> GetArgs cmdPos cmd argDocs |> continue
+  V.EvKey V.KDown [] ->
+    lzRight editors |> GetArgs cmdPos cmd argDocs |> continue
   V.EvKey V.KUp [] -> lzLeft editors |> GetArgs cmdPos cmd argDocs |> continue
   V.EvKey (V.KChar 'f') [V.MCtrl] -> suspendAndResume $ do
     let currentTxt = lzCurrent editors |> snd |> getEditContents |> T.concat
@@ -361,21 +369,25 @@ main = do
 
   let state = mkSelect checkedOkCfg
 
-  let lookupCmd (n,m) = do
+  let lookupCmd (n, m) = do
         section <- toList checkedOkCfg !!? (fromIntegral n)
         commands section !!? (fromIntegral m)
 
   case runById args >>= lookupCmd of
-    Just (OkCommand{bash=ACommand command})  ->
-            let expectedArgs = arguments command
-                theCmd = substituteNamedArgs (zip expectedArgs (otherArguments args)) command
-                toRun  = proc "bash" ["-c", Bash.prettyText theCmd]
-            in runProcess_ toRun >> Prelude.exitSuccess
-    -- print ("Run cmd id"<>show (comment command)<>show (otherArguments args))>>Prelude.exitSuccess
-    Just (OkCommand{bash=Disgressions ds s}) -> do
-        putStrLn ("The command "<>s<>" cannot be run because:")
-        traverse_ print ds
-        exitFailure
+    Just (OkCommand { bash = ACommand command }) ->
+      let expectedArgs = arguments command
+          theCmd       = substituteNamedArgs
+            (zip expectedArgs (otherArguments args))
+            command
+          toRun = proc "bash" ["-c", Bash.prettyText theCmd]
+      in  if printOut args
+            then print (Bash.prettyText theCmd)
+            else runProcess_ toRun >> Prelude.exitSuccess
+
+    Just (OkCommand { bash = Disgressions ds s }) -> do
+      putStrLn ("The command " <> s <> " cannot be run because:")
+      traverse_ print ds
+      exitFailure
     Nothing -> pure ()
 
   x <- defaultMain app state
@@ -384,8 +396,13 @@ main = do
     Done cmdPos theCmd
       | printOut args -> putStrLn $ Bash.prettyText theCmd
       | otherwise -> do
-            runProcess_ (proc "bash" ["-c", Bash.prettyText theCmd])
-            T.hPutStrLn stderr ("To run this command again use the flag \x1b[33m'-r "<>unparseSectionID cmdPos<>"'\x1b[0m optionally followed by arguments, if the command needs any")
+        runProcess_ (proc "bash" ["-c", Bash.prettyText theCmd])
+        T.hPutStrLn
+          stderr
+          ("To run this command again use the flag \x1b[33m'-r "
+          <> unparseSectionID cmdPos
+          <> "'\x1b[0m optionally followed by arguments, if the command needs any"
+          )
     Quit -> pure ()
     _    -> error "Wrong state"
  where
@@ -393,10 +410,11 @@ main = do
   handler state (VtyEvent ev) = case ev of
     V.EvKey V.KEsc [] -> halt Quit
     _                 -> case state of
-      Select theList              -> handleSelect theList ev
+      Select theList -> handleSelect theList ev
       --TODO: get last args
-      GetArgs cmdPos cmd argDocs editors -> handleEditor ev cmdPos cmd argDocs editors
-      other                       -> halt other
+      GetArgs cmdPos cmd argDocs editors ->
+        handleEditor ev cmdPos cmd argDocs editors
+      other -> halt other
   handler state _ = continue state
 
   app = App { appDraw         = (\x -> [x]) <. ui
