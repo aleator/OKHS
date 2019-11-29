@@ -23,24 +23,18 @@ import           Brick.Widgets.Center
 import           System.Process.Typed
 
 import           Data.Char
-import qualified Data.ByteString               as BS
 import           Data.Text.Zipper               ( textZipper )
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import qualified Data.Text.IO                  as T
-import qualified Data.Text.Lazy                as LT
 import qualified Data.Text.Lazy.Encoding       as LT
 import qualified Data.Map                      as Map
---import           Data.Map                       ( Map )
 import           Data.FileEmbed
 -- TODO Drop bash direct import
 import qualified Language.Bash.Pretty          as Bash
 
 import           Control.Exception
 import           System.Exit
-import           Control.Monad                  ( when
-                                                , unless
-                                                )
 import qualified GHC.IO.Exception              as IOE
 import qualified Database.SQLite.Simple        as SQL
 import           System.Directory
@@ -117,9 +111,9 @@ renderSelect lst = joinBorders
                            cmdHdrAttr
   funAux i commandStr comment style =
     padRight Max
-      $ (   (show (i + 1) |> T.pack |> (<> ". ") |> txt |> withAttr cmdNumAttr)
+      $ (   (show (i + 1) |> (<> ". ") |> txt |> withAttr cmdNumAttr)
         <+> (   (comment |> txtWrap |> withAttr style)
-            <=> (commandStr |> T.pack |> txtWrap)
+            <=> (commandStr |> toText|> txtWrap)
             )
         )
 
@@ -152,9 +146,8 @@ handleSelect theList ev = case ev of
         case arguments cmd of
           [] ->
             substituteNamedArgs [] cmd
-              |> Done (lzIndex theList, fromIntegral cmdPos)
+              |> Done (succ (lzIndex theList), succ (fromIntegral cmdPos))
               |> halt
-            -- halt (Done (substituteOkCommand [] promoted))
           (x : xs) ->
             (x :| xs)
               |> mkEditor (lzIndex theList, fromIntegral cmdPos)
@@ -231,14 +224,14 @@ handleEditor ev cmdPos cmd argDocs editors = case ev of
     let currentTxt = lzCurrent editors |> snd |> getEditContents |> T.concat
     (ec, fileBs) <- readProcessStdout
       (proc "fzf"
-            ["-q", T.unpack currentTxt, "--preview", "bat --color=always {}"]
+            ["-q", toString currentTxt, "--preview", "bat --color=always {}"]
       )
                     -- TODO: Be configurable etc. 
     case ec of
       ExitFailure _ -> return (GetArgs cmdPos cmd argDocs editors)
           -- TODO: Think if this needs to behave differently on different errors
       ExitSuccess   -> do
-        let file = T.strip (LT.toStrict (LT.decodeUtf8 fileBs))
+        let file = T.strip (toStrict (LT.decodeUtf8 fileBs))
             n    = T.length file
         editors
           |> changeCurrentWithName
@@ -294,7 +287,7 @@ data OkParseError = OkParseError String deriving Show
 
 instance Exception OkParseError
 
-defaultUtilsFile :: BS.ByteString
+defaultUtilsFile :: ByteString
 defaultUtilsFile = $(embedFile "util")
 
 onNonExistingConfig :: FilePath -> (FilePath -> IO ()) -> IO ()
@@ -309,7 +302,7 @@ writeAuxiliaryFiles = do
   createDirectoryIfMissing True configsAt -- TODO: Fix this in OKHS
   --
   -- The util file
-  onNonExistingConfig "util" (flip BS.writeFile defaultUtilsFile)
+  onNonExistingConfig "util" (flip writeFileBS defaultUtilsFile)
 
   -- Type specifiers
   let
@@ -333,7 +326,7 @@ main = do
 --  SQL.close conn -- TODO: Use with & finally here
   writeAuxiliaryFiles -- Should this be always done
   (okcfg, upgrade) <-
-    (   T.readFile ".ok"
+    (   readFileText ".ok"
     >>= readOkSections
     .>  traverse parseOkSection
     .>  either (throw . OkParseError) (, True)
@@ -354,7 +347,7 @@ main = do
 
   args <- getArguments
 
-  when (convert args && upgrade) $ do
+  when (convert args && upgrade) $
     writeFile
       ".ok"
       (  Dhall.embed Dhall.inject (map unparseOkSection okcfg)
@@ -364,31 +357,35 @@ main = do
 
   checkedOkCfg :: NonEmpty (OkSection' [PerhapsRunnableCommand]) <-
     case okcfg of
-      []       -> error ".ok file has no content"
+      []       -> putStrLn ".ok file has no content" >> exitFailure
       (x : xs) -> traverse validateOkSection (x :| xs)
 
   let state = mkSelect checkedOkCfg
 
   let lookupCmd (n, m) = do
-        section <- toList checkedOkCfg !!? (fromIntegral n)
-        commands section !!? (fromIntegral m)
+        section <- toList checkedOkCfg !!? fromIntegral (pred n)
+        commands section !!? fromIntegral (pred m)
 
   case runById args >>= lookupCmd of
     Just (OkCommand { bash = ACommand command }) ->
-      let expectedArgs = arguments command
-          theCmd       = substituteNamedArgs
-            (zip expectedArgs (otherArguments args))
-            command
-          toRun = proc "bash" ["-c", Bash.prettyText theCmd]
+      let theCmd       
+           = substituteNamedArgs
+                   (zip (arguments command)
+                        (otherArguments args))
+                   command
+          cmdText = Bash.prettyText theCmd
       in  if printOut args
-            then print (Bash.prettyText theCmd)
-            else runProcess_ toRun >> Prelude.exitSuccess
+            then print cmdText
+            else do
+                 runProcess_ (proc "bash" ["-c",cmdText])
+                 Prelude.exitSuccess
 
     Just (OkCommand { bash = Disgressions ds s }) -> do
       putStrLn ("The command " <> s <> " cannot be run because:")
       traverse_ print ds
       exitFailure
-    Nothing -> pure ()
+
+    Nothing -> pass
 
   x <- defaultMain app state
 
@@ -403,7 +400,7 @@ main = do
           <> unparseSectionID cmdPos
           <> "'\x1b[0m optionally followed by arguments, if the command needs any"
           )
-    Quit -> pure ()
+    Quit -> pass
     _    -> error "Wrong state"
  where
 

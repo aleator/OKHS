@@ -3,11 +3,11 @@
 Did you just `cd` into an old project and have no clue what to do next?
 You need an `.ok` file!
 
-Maintaining services and development work often accrue many scripts and
-commands that are necessary but hard to remember after significant amounts of
-time. OKHS allows storing these commands into '.ok' files along with their
-documentation.  The OKHS program is designed to allow you to quickly select
-the required commands and input their arguments. 
+The `.ok` files are the place where you collect all the commands to be run in a
+given directory. Collecting these in a known place is a huge help as many
+project specific commands can be hard to remember after significant amounts of
+time.  The OKHS program is designed to help you maintain and select commands from
+you `.ok` file.
 
 Just `cd` into that old project, type `ok` (or your preferred alias) and 
 be greeted with the list of the commands required to work with your project.
