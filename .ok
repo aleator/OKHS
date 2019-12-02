@@ -6,6 +6,8 @@ in  [   ok.section
             , ok.cmd
                 "stack install;"
                 "Install the binary so the ok-abbreviation will find it"
+			, ok.cmd "make README.md"
+					 "Build the readme. This needs to be done before a push"
             ]
         ⫽ ok.docs
             ''

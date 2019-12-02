@@ -1,3 +1,4 @@
+''
 # OKHS -- Simple Runbooks for Terminal Users
 
 Did you just `cd` into an old project and have no clue what to do next?
@@ -51,6 +52,12 @@ There is one command per line, followed by a mandatory freeform comment.
 Empty lines are allowed and lines containing only a comment are section
 titles. You get a different tab in the user interface for each section.
 
+## Makefiles
+
+Makefiles are a great alternative to `.ok` files. They just aren't too
+discoverable. If you have a `Makefile` in the directory you launch OKHS
+from the Makefile targets will appear as their own section in the
+user interface. 
 
 ## Dhall .ok files.
 
@@ -61,50 +68,7 @@ build parametrised commands that can be tuned for several projects.
 Here is the above ok-bash style file converted into dhall:
 
 ```
-let ok  = ~/.config/OKHS/util            -- OKHS autogenerates some utils in your XDG_CONFIG 
-                                         -- writing .ok files nicer. This line imports them.
-
-in  [ ok.section "Development commands"  -- This defines a section
-            [ ok.cmd "./build.sh fibblewidget"  -- This one is a command specification
-                     "Run the lib in ghcid"
-
-            , ok.cmd "python test.py $widgetName"
-                     "Tests the given widget"
-              //  {limitations = [ok.needsAFile "manifest.rc"]}
-                                          -- OKHS allows you to add limitations to make sure
-                                          -- that some simple preconditions are met before running
-                                          -- a command. 
-            ]
-
-        // ok.docs                         -- This is the 'section docs' block which allows you to
-                                           -- add some documentation to the user interface.
-            ''
-             Here are the essential commands for building this.
-             Currently, there are three widgets:
-
-             * fibbleWidget
-             * wobbleWidget
-             * fooWidget
-            ''
-
-    ,   ok.section "Publishing"              -- Another section here!
-            [ ok.cmd "git commit -am $msg" 
-                     "Commit stuff"
-            , ok.cmd "git push" 
-                     "Do a push"
-            , ok.cmd "slack-shout $channel $msg"
-                     "Tell coworkers about this"
-                // ok.argDocs               -- You can also document the individual
-                                            -- arguments.
-                  (toMap 
-                    {channel="The slack channel to post (e.g. 'whole-team', 'feature-X')"
-                    ,msg="Describe the changes you pushed"}) 
-                                            
-
-            ]
-      ] 
-      : ok.OKHS
-
+${./ReadmeExample.ok as Text}
 ```
 
 The dhall configuration is much more verbose, but it can express lot more than
@@ -131,10 +95,11 @@ Makefiles make a great `.ok` files! They even track your command dependencies
 for you. However, makefiles serve a bit different target, namely automatically
 building some file, and if that isn't what you are doing, then `.ok` might be a
 better choice. For example, make targets aren't as easy to parametrize as .ok
-commands are.
+commands are and they are usually less discoverable in the sense of "what should
+I `make` now?".
 
-Upcoming: OKHS user interface will probably be able to read makefiles
-at some point.
+OKHS will show you `make` targets as their own section if you execute it in a
+directory containing a Makefile.
 
 ## ok-bash
 
@@ -166,3 +131,4 @@ and left to right, which I find bit distracting. In contrast, and after getting
 used to it, writing everything in one direction feels really nice.
 
 I think I like flow a lot and the left-to-right idea even more.
+''

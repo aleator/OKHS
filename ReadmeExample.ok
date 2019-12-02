@@ -1,0 +1,43 @@
+let ok  = ~/.config/OKHS/util            -- OKHS autogenerates some utils in your XDG_CONFIG 
+                                         -- writing .ok files nicer. This line imports them.
+
+in  [ ok.section "Development commands"  -- This defines a section
+            [ ok.cmd "./build.sh fibblewidget"  -- This one is a command specification
+                     "Run the lib in ghcid"
+
+            , ok.cmd "python test.py $widgetName"
+                     "Tests the given widget"
+              //  {limitations = [ok.needsAFile "manifest.rc"]}
+                                          -- OKHS allows you to add limitations to make sure
+                                          -- that some simple preconditions are met before running
+                                          -- a command. 
+            ]
+
+        // ok.docs                         -- This is the 'section docs' block which allows you to
+                                           -- add some documentation to the user interface.
+            ''
+             Here are the essential commands for building this.
+             Currently, there are three widgets:
+
+             * fibbleWidget
+             * wobbleWidget
+             * fooWidget
+            ''
+
+    ,   ok.section "Publishing"              -- Another section here!
+            [ ok.cmd "git commit -am $msg" 
+                     "Commit stuff"
+            , ok.cmd "git push" 
+                     "Do a push"
+            , ok.cmd "slack-shout $channel $msg"
+                     "Tell coworkers about this"
+                // ok.argDocs               -- You can also document the individual
+                                            -- arguments.
+                  (toMap 
+                    {channel="The slack channel to post (e.g. 'whole-team', 'feature-X')"
+                    ,msg="Describe the changes you pushed"}) 
+                                            
+
+            ]
+      ] 
+      : ok.OKHS

@@ -21,11 +21,14 @@ library
   exposed-modules:
       OKHS.Lib
     -- , OKHS.Limitations
+    , OKHS.Make
     , OKHS.Types
     , CmdArgs
     , Prelude
   other-modules:
       Paths_OKHS
+  default-extensions: OverloadedStrings
+  ghc-options: -Werror=incomplete-patterns -Werror=tabs
   hs-source-dirs:
       src
   build-depends:
@@ -45,10 +48,12 @@ library
     , validation
     , pretty
     , optparse-applicative
+    , makefile
   default-language: Haskell2010
 
 executable OKHS-exe
   main-is: Main.hs
+  default-extensions: OverloadedStrings
   other-modules:
       Paths_OKHS
   hs-source-dirs:
@@ -75,6 +80,7 @@ executable OKHS-exe
     , file-embed
     , bytestring
     , validation
+    , makefile
   default-language: Haskell2010
 
 test-suite OKHS-test
@@ -94,4 +100,5 @@ test-suite OKHS-test
     , uniplate
     , vty
     , containers
+    , makefile
   default-language: Haskell2010

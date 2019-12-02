@@ -2,12 +2,15 @@
 {-#LANGUAGE OverloadedStrings #-}
 {-#LANGUAGE TupleSections #-}
 {-#LANGUAGE TemplateHaskell #-}
+{-#LANGUAGE LambdaCase #-}
 {-#LANGUAGE ScopedTypeVariables #-}
 module Main where
 -- import           Debug.Pretty.Simple
 
 import           OKHS.Lib
 import           OKHS.Types
+import           OKHS.Make
+import           Data.Makefile.Parse
 import           Limitations
 
 import           Brick
@@ -69,7 +72,7 @@ mkSelect =
 
 renderSelect
   :: (Traversable t, Splittable t, Ord n, Show n)
-  => LZipper (OkSection' (GenericList n t (PerhapsRunnableCommand)))
+  => LZipper (OkSection' (GenericList n t PerhapsRunnableCommand))
   -> Widget n
 renderSelect lst = joinBorders
   (withBorderStyle
@@ -88,7 +91,7 @@ renderSelect lst = joinBorders
             (txt " Constraint violations ")
         ]
       _ -> []
-  list       = (lst |> lzCurrent |> commands |> renderListWithIndex fun True)
+  list       = lst |> lzCurrent |> commands |> renderListWithIndex fun True
   docuWidget = txt .> borderWithLabel (txt " Section docs ")
   labels =
     lst
@@ -111,7 +114,7 @@ renderSelect lst = joinBorders
                            cmdHdrAttr
   funAux i commandStr comment style =
     padRight Max
-      $ (   (show (i + 1) |> (<> ". ") |> txt |> withAttr cmdNumAttr)
+        (   (show (i + 1) |> (<> ". ") |> txt |> withAttr cmdNumAttr)
         <+> (   (comment |> txtWrap |> withAttr style)
             <=> (commandStr |> toText|> txtWrap)
             )
@@ -146,7 +149,7 @@ handleSelect theList ev = case ev of
         case arguments cmd of
           [] ->
             substituteNamedArgs [] cmd
-              |> Done (succ (lzIndex theList), succ (fromIntegral cmdPos))
+              |> Done (lzIndex theList, fromIntegral cmdPos)
               |> halt
           (x : xs) ->
             (x :| xs)
@@ -161,9 +164,9 @@ appCurrentCommand
   => (fa -> m fa)
   -> LZipper (OkSection' fa)
   -> m (LZipper (OkSection' fa))
-appCurrentCommand op = appCurrent <| \okSection -> do
+appCurrentCommand op = appCurrent (\okSection -> do
   xNew <- op (commands okSection)
-  pure (okSection { commands = xNew })
+  pure (okSection { commands = xNew }))
 
 changeCurrentCommand
   :: (t -> t) -> LZipper (OkSection' t) -> LZipper (OkSection' t)
@@ -192,7 +195,7 @@ renderEditors cmd argDocs argEditors =
     |> borderWithLabel (txt (" " <> renderOkCommand cmd <> " "))
  where
   named b (argName, editor) =
-    let editing = (name argName <+> renderEditor (vBox . map txt) b editor)
+    let editing = (name argName <+> renderEditor (map txt.> vBox) b editor)
     in  case (Map.lookup argName argDocs) of
           Nothing  -> editing
           Just doc -> editing <=> txt doc
@@ -220,7 +223,7 @@ handleEditor ev cmdPos cmd argDocs editors = case ev of
   V.EvKey V.KDown [] ->
     lzRight editors |> GetArgs cmdPos cmd argDocs |> continue
   V.EvKey V.KUp [] -> lzLeft editors |> GetArgs cmdPos cmd argDocs |> continue
-  V.EvKey (V.KChar 'f') [V.MCtrl] -> suspendAndResume $ do
+  V.EvKey (V.KChar 'f') [V.MCtrl] -> suspendAndResume <| do
     let currentTxt = lzCurrent editors |> snd |> getEditContents |> T.concat
     (ec, fileBs) <- readProcessStdout
       (proc "fzf"
@@ -329,7 +332,7 @@ main = do
     (   readFileText ".ok"
     >>= readOkSections
     .>  traverse parseOkSection
-    .>  either (throw . OkParseError) (, True)
+    .>  either (OkParseError .> throw) (, True)
     .>  evaluate
     )
     `catch` (\(_ :: OkParseError) ->
@@ -347,7 +350,7 @@ main = do
 
   args <- getArguments
 
-  when (convert args && upgrade) $
+  when (convert args && upgrade) <|
     writeFile
       ".ok"
       (  Dhall.embed Dhall.inject (map unparseOkSection okcfg)
@@ -355,16 +358,20 @@ main = do
       |> show
       )
 
+  maybeMakefile <- parseMakefile >>= \case 
+                    Right make -> parseOkSection (makeToOk make) |> pure 
+                    Left e -> Left e |> pure --TODO, should this warn about unparseable makefile
+  let okcfgAndMake = okcfg  ++ either (const []) (:[]) maybeMakefile
   checkedOkCfg :: NonEmpty (OkSection' [PerhapsRunnableCommand]) <-
-    case okcfg of
+    case okcfgAndMake of
       []       -> putStrLn ".ok file has no content" >> exitFailure
       (x : xs) -> traverse validateOkSection (x :| xs)
 
   let state = mkSelect checkedOkCfg
 
   let lookupCmd (n, m) = do
-        section <- toList checkedOkCfg !!? fromIntegral (pred n)
-        commands section !!? fromIntegral (pred m)
+        section <- toList checkedOkCfg !!? fromIntegral n
+        commands section !!? fromIntegral m
 
   case runById args >>= lookupCmd of
     Just (OkCommand { bash = ACommand command }) ->
@@ -391,7 +398,7 @@ main = do
 
   case x of
     Done cmdPos theCmd
-      | printOut args -> putStrLn $ Bash.prettyText theCmd
+      | printOut args -> putStrLn ( Bash.prettyText theCmd )
       | otherwise -> do
         runProcess_ (proc "bash" ["-c", Bash.prettyText theCmd])
         T.hPutStrLn
@@ -414,7 +421,7 @@ main = do
       other -> halt other
   handler state _ = continue state
 
-  app = App { appDraw         = (\x -> [x]) <. ui
+  app = App { appDraw         = ui .> (\x -> [x])
             , appChooseCursor = showFirstCursor
             , appHandleEvent  = handler
             , appStartEvent   = return
