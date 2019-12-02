@@ -11,24 +11,28 @@ the commands required to work with your project.
 The OKHS program is designed to help you maintain and select commands from you
 `.ok` file through a simple terminal user interface.
 
+(Screenshot : Todo)
+
 # The big idea
 
 The OKHS program doesn't do much by itself. It only provides a common place for
-you to store your scripts (the `.ok`) file and gives a nice TUI for selecting
-commands. The biggest benefit will come from maintaining `.ok` files for your
-projects.  Collecting project specific scripts and commands in a git friendly,
-known, place is a huge help as many project specific commands can be hard to
-remember after any significant amount of time.
+you to store your scripts (the `.ok` file) and it gives you a nice TUI for
+selecting commands and filling in parameters. The biggest benefit will come
+from maintaining `.ok` files for your projects.  Collecting project specific
+scripts and commands in a git friendly, known, place is a huge help as many
+project specific commands can be hard to remember after any significant amount
+of time.
 
 In my experience, having `.ok` files and this small helper program has made it
-much more likely that I actually store the important commands *somewhere*.
+much more likely that I actually store the important commands *somewhere*. This
+has made me more efficient.
 
 # Usage
 
 Clone the repository and install the program doing "[stack](https://www.haskellstack.org) install".
 Then create a `.ok` file in your project root. You can either do a simple `ok-bash` style
 `.ok` file or a bit more verbose, but more flexible, [dhall](https://github.com/dhall-lang/dhall-lang)
-configuration file.
+configuration file, or you can simply use an existing makefile.
 
 ## ok-bash style .ok files
 
@@ -51,6 +55,12 @@ There is one command per line, followed by a mandatory freeform comment.
 Empty lines are allowed and lines containing only a comment are section
 titles. You get a different tab in the user interface for each section.
 
+## Makefiles
+
+Makefiles are a great alternative to `.ok` files. They just aren't too
+discoverable. If you have a `Makefile` in the directory you launch OKHS
+from the Makefile targets will appear as their own section in the
+user interface. 
 
 ## Dhall .ok files.
 
@@ -131,10 +141,11 @@ Makefiles make a great `.ok` files! They even track your command dependencies
 for you. However, makefiles serve a bit different target, namely automatically
 building some file, and if that isn't what you are doing, then `.ok` might be a
 better choice. For example, make targets aren't as easy to parametrize as .ok
-commands are.
+commands are and they are usually less discoverable in the sense of "what should
+I `make` now?".
 
-Upcoming: OKHS user interface will probably be able to read makefiles
-at some point.
+OKHS will show you `make` targets as their own section if you execute it in a
+directory containing a Makefile.
 
 ## ok-bash
 
