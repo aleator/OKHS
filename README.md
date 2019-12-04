@@ -16,7 +16,7 @@ The OKHS program is designed to help you maintain and select commands from you
 `.ok` file through a simple terminal user interface.
 
 <p align="center">
-  <img src="https://github.com/aleator/OKHS/blob/master/usage.svg?raw=true">
+  <img src="https://github.com/aleator/OKHS/blob/master/usage.svg">
 </p>
 
 
