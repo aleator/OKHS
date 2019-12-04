@@ -1,3 +1,4 @@
+![OKHS](https://github.com/aleator/OKHS/blob/master/logo.png?raw=true)
 # OKHS -- Simple Runbooks for Terminal Users
 
 Did you just `cd` into an old project and have no clue what to do next?
