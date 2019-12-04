@@ -15,7 +15,10 @@ the commands required to work with your project.
 The OKHS program is designed to help you maintain and select commands from you
 `.ok` file through a simple terminal user interface.
 
-(Screenshot : Todo)
+<p align="center">
+  <img src="https://github.com/aleator/OKHS/blob/master/usage.svg?raw=true">
+</p>
+
 
 # The big idea
 
