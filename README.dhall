@@ -19,6 +19,8 @@ The OKHS program is designed to help you maintain and select commands from you
 <p align="center">
   <img src="https://github.com/aleator/OKHS/blob/master/usage.svg">
 </p>
+(Sorry about poor recording. TUI's are hard to capture if you don't want a
+video file.)
 
 
 # The big idea
