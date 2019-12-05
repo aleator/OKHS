@@ -358,9 +358,12 @@ main = do
       |> show
       )
 
-  maybeMakefile <- parseMakefile >>= \case 
+  maybeMakefile <- (parseMakefile >>= \case 
                     Right make -> parseOkSection (makeToOk make) |> pure 
-                    Left e -> Left e |> pure --TODO, should this warn about unparseable makefile
+                    Left e -> Left e |> pure 
+                    )
+                    `catch` (\(_::SomeException) -> pure (Left "no makefile"))
+            --TODO, should this warn about unparseable makefile
   let okcfgAndMake = okcfg  ++ either (const []) (:[]) maybeMakefile
   checkedOkCfg :: NonEmpty (OkSection' [PerhapsRunnableCommand]) <-
     case okcfgAndMake of

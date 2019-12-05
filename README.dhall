@@ -37,16 +37,30 @@ In my experience, having `.ok` files and this small helper program has made it
 much more likely that I actually store the important commands *somewhere*. This
 has made me more efficient.
 
+# Installation
+
+1. Clone the this repository 
+2. Install [stack](https://www.haskellstack.org) for building this program
+3. Run `stack --local-bin-path $HOME/.local/bin install`. 
+   (You can change the bin path to point to a suitable location)
+4. Go make a pot of tea and have a sandwich while your at it 
+5. Add an alias:
+    * Fish shell: `abbr --add ok $HOME/.local/bin/OKHS-exe`
+    * Bash: add the line `alias ok=$HOME/.local/bin/OKHS-exe` to your `.bash_rc`
+6. You're done. Type `ok`.
+
 # Usage
 
-Clone the repository and install the program doing "[stack](https://www.haskellstack.org) install".
-Then create a `.ok` file in your project root. You can either do a simple `ok-bash` style
-`.ok` file or a bit more verbose, but more flexible, [dhall](https://github.com/dhall-lang/dhall-lang)
-configuration file, or you can simply use an existing makefile.
+To get started, create an `.ok` file in some project directory. You can either
+do a simple `ok-bash` style `.ok` file or a bit more verbose, but more
+flexible, [dhall](https://github.com/dhall-lang/dhall-lang) configuration file,
+or you can simply use an existing makefile.
+
+See examples and instructions below:
 
 ## ok-bash style .ok files
 
-Here is an example.
+Here is an example of `ok-bash` style `.ok` file:
 
 ```
 # Development commands
@@ -61,15 +75,15 @@ git push                    # Do a push
 slack-shout $channel $msg   # Tell coworkers about this
 ```
 
-There is one command per line, followed by a mandatory freeform comment.
+There is one command per line, each followed by a mandatory comment.
 Empty lines are allowed and lines containing only a comment are section
-titles. You get a different tab in the user interface for each section.
+titles. Each section is presented in a different tab in the user interface.
 
 ## Makefiles
 
 Makefiles are a great alternative to `.ok` files. They just aren't too
 discoverable. If you have a `Makefile` in the directory you launch OKHS
-from the Makefile targets will appear as their own section in the
+from, the Makefile targets will appear as their own section in the
 user interface. 
 
 ## Dhall .ok files.
@@ -89,59 +103,71 @@ the ok-bash style files.
 
 # Alternatives
 
+There are few other programs that can serve the same needs. For example,
+
 ## `history`
 
-Command history files have similar benefits. However, they are not usually
-project or directory based. Also, so any cruft you happen to have typed will be
-found in the `.history`, if it is found at all after few months of doing other
-work. It is also quite hard to determine if the command in the history was the
-right one.  
+Command history files have similar benefits as `.ok` files. However, they are
+not usually project or directory based. Also, so any cruft you happen to have
+typed will alsobe found in the `.history`. It can be quite hard to determine
+if the command in the history was the right one.  
 
-The `.ok` files are curated (by you) to contain the working versions of the commands.
+The `.ok` files are curated (by you) to contain the working versions of the
+commands.
 
-History files do have one benefit over `.ok`-files: you can see which step do
-go together.
+History files do have one benefit over `.ok`-files: you can see which steps do
+go together and you don't need to write them yourself. But, why have only one
+when you can do both?
 
 ## Makefiles (or your favourite alternative)
 
-Makefiles make a great `.ok` files! They even track your command dependencies
-for you. However, makefiles serve a bit different target, namely automatically
-building some file, and if that isn't what you are doing, then `.ok` might be a
-better choice. For example, make targets aren't as easy to parametrize as .ok
-commands are and they are usually less discoverable in the sense of "what should
-I `make` now?".
+Makefiles make a great `.ok` files! As an added bonus, they can track your
+command dependencies for you. However, makefiles serve a bit different need,
+namely, automatically building some file. If that isn't what you are doing,
+then an `.ok` file might be a better choice.  Make targets aren't as easy
+to parametrize as .ok commands are and they are usually less discoverable in
+the sense of "what should I `make` now?".
 
-OKHS will show you `make` targets as their own section if you execute it in a
-directory containing a Makefile.
+Regardless, OKHS will show you `make` targets as their own section if you
+execute it in a directory containing a Makefile.
 
 ## ok-bash
 
-This tool was inspired by [`ok-bash`](http://secretgeek.net/ok). It works
-much the same way and it can also use (and convert!) `.ok` files meant
-for ok-bash. Ok-bash is a great tool and if you don't care for a text-mode
-ui or using dhall you might prefer to use that instead of OKHS.
+The present tool was inspired by [`ok-bash`](http://secretgeek.net/ok). The
+`ok-bash` is a similar program, but with a simple command line interface.  OKHS
+works much the same way as `ok-bash` and it can also use (and convert!) `.ok`
+files meant for ok-bash. Ok-bash is a great tool and if you don't care for a
+text-mode ui or using dhall/makefiles.
+
+Also, if you find the compilation time of OKHS too long, you might prefer to
+use `ok-bash` instead.
 
 # Hacking
 
-The OKHS has been my 'time off' project. As such, I've taken the liberty of
-writing *weird* Haskell code for learning purposes.
+Pulls and issues are welcome. Try to follow the existing style and make
+sure OKHS doesn't run arbitrary commands at startup. If you want, you
+can also fork this in Rust.
 
-Firstly, I'm using the alternative Prelude called
+The OKHS has been my 'time off' project. As such, I've taken the liberty of
+writing *weird* Haskell code for fun.
+
+Firstly, OKHS is using the alternative Prelude called
 [Relude](https://github.com/kowainik/relude). This changes some basic Haskell
 functions, drops some of the historical cruft (`head` etc.) and reduces the
 amount of imports I have to type. In practise really like Relude. Besides of
 being a better prelude it also gives me a place to put my own common functions
 (ie. the `Prelude.hs` wrapper that you use with `base-noprelude.).
 
-Secondly, I use [flow](http://hackage.haskell.org/package/flow) which replaces
-Haskell composition operators (`.`,`$` and `&`) with arrow like symbols.  With
-flow I can also choose any direction of composition I want and the composition
-operator symbols make the reading direction obvious.
+Secondly, the project uses [flow](http://hackage.haskell.org/package/flow)
+which replaces Haskell composition operators (`.`,`$` and `&`) with arrow like
+symbols.  With flow you can also choose any direction of composition you want and
+the composition operator symbols make the reading direction obvious.
 
 I also have made effort in making all the code read from left to right.
-Normally, Haskell kind of forces you to occasionally read from right to left
+Normally, Haskell forces you to occasionally read from right to left
 and left to right, which I find bit distracting. In contrast, and after getting
 used to it, writing everything in one direction feels really nice.
 
-I think I like flow a lot and the left-to-right idea even more.
+I think I like flow a lot and the left-to-right idea even more, so aim to
+preserve that if you decide to hack on this.
 ''

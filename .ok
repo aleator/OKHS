@@ -15,6 +15,10 @@ in  [   ok.section
               out how to get ghcid to watch both 
               the library and the exe at the same time...
             ''
+      ,   ok.section "github"
+            [ok.cmd "make README.md && git add README.md && git push"  
+                    "Update readme & push to github"
+            ]
       ,   ok.section "Tests"
             [ok.cmd "echo $1 $2" "Echo out two things"
                 // ok.argDocs (toMap {`1`="The first Thing"
