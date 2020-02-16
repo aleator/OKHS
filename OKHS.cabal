@@ -25,6 +25,7 @@ library
     , OKHS.Types
     , CmdArgs
     , Prelude
+    , OKHS.Configuration
   other-modules:
       Paths_OKHS
   default-extensions: OverloadedStrings
@@ -56,6 +57,7 @@ executable OKHS-exe
   default-extensions: OverloadedStrings
   other-modules:
       Paths_OKHS
+      , CmdArgs
   hs-source-dirs:
       app
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -static
