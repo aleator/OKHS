@@ -137,10 +137,13 @@ handleSelect
 handleSelect trigger theList ev = case ev of
   V.EvKey (V.KChar n) [] 
    | isDigit n ->
-    let goTo = readMaybe [n] |> maybe 0 pred |> listMoveTo
+    let
+      itemNumber = readMaybe [n] |> maybe 0 pred
+      goTo = itemNumber  |> listMoveTo
     in  case trigger of
-         Safe  -> changeCurrentCommand goTo theList |> Select Armed |> continue --TODO: Auto-enter after this
-         Armed -> changeCurrentCommand goTo theList |> fireCurrentCmd 
+         Armed previousNumber
+           | previousNumber == itemNumber -> changeCurrentCommand goTo theList |> fireCurrentCmd 
+         _  -> changeCurrentCommand goTo theList |> Select ( Armed itemNumber) |> continue --TODO: Auto-enter after this
   V.EvKey V.KRight [] -> theList |> lzRight |> Select Safe |> continue
   V.EvKey V.KLeft  [] -> theList |> lzLeft |> Select Safe |> continue
   V.EvKey V.KEnter [] -> fireCurrentCmd theList
@@ -264,7 +267,7 @@ handleEditor ev cmdPos cmd argDocs editors = case ev of
 
 -- <# STATE #> 
 
-data Trigger = Safe | Armed deriving (Show,Eq)
+data Trigger = Safe | Armed Int deriving (Show,Eq)
 
 data ProgramState = Select Trigger (LZipper (OkSection' (GenericList Text Seq.Seq
                                          PerhapsRunnableCommand)))
