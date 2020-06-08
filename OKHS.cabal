@@ -23,7 +23,7 @@ library
     -- , OKHS.Limitations
     , OKHS.Make
     , OKHS.Types
-    , CmdArgs
+--    , CmdArgs
     , Prelude
     , OKHS.Configuration
   other-modules:
@@ -48,7 +48,6 @@ library
     , time
     , validation
     , pretty
-    , optparse-applicative
     , makefile
   default-language: Haskell2010
 
@@ -83,6 +82,7 @@ executable OKHS-exe
     , bytestring
     , validation
     , makefile
+    , optparse-applicative
   default-language: Haskell2010
 
 test-suite OKHS-test

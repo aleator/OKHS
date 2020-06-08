@@ -27,7 +27,6 @@ import           System.Process.Typed
 
 import           Data.Char
 import           Data.Text.Zipper               ( textZipper )
-import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import qualified Data.Text.IO                  as T
 import qualified Data.Text.Lazy.Encoding       as LT
@@ -47,7 +46,7 @@ import           CmdArgs
 
 
 ui :: ProgramState -> Widget Text
-ui (Select lst) = renderSelect lst
+ui (Select _ lst) = renderSelect lst
 ui (GetArgs _ cmd argDocs argEditors) = renderEditors cmd argDocs argEditors
 ui _ = str "Oops. This thing broke"
 
@@ -67,7 +66,7 @@ mkSelect =
   --          (Seq.fromList (commands okSection)) 2)
   -- )
     .> lzFromNonEmpty
-    .> Select
+    .> Select Safe
   -- TODO: preselect last selection
 
 renderSelect
@@ -131,33 +130,51 @@ cmdDisabledAttr :: AttrName
 cmdDisabledAttr = "select" <> "cmd" <> "hdr_disabled"
 
 handleSelect
-  :: LZipper (OkSection' (GenericList Text Seq.Seq PerhapsRunnableCommand))
+  :: Trigger
+  -> LZipper (OkSection' (GenericList Text Seq.Seq PerhapsRunnableCommand))
   -> V.Event
   -> EventM Text (Next ProgramState)
-handleSelect theList ev = case ev of
-  V.EvKey (V.KChar n) [] | isDigit n ->
+handleSelect trigger theList ev = case ev of
+  V.EvKey (V.KChar n) [] 
+   | isDigit n ->
     let goTo = readMaybe [n] |> maybe 0 pred |> listMoveTo
-    in  changeCurrentCommand goTo theList |> Select |> continue --TODO: Auto-enter after this
-  V.EvKey V.KRight [] -> theList |> lzRight |> Select |> continue
-  V.EvKey V.KLeft  [] -> theList |> lzLeft |> Select |> continue
-  V.EvKey V.KEnter [] ->
+    in  case trigger of
+         Safe  -> changeCurrentCommand goTo theList |> Select Armed |> continue --TODO: Auto-enter after this
+         Armed -> changeCurrentCommand goTo theList |> fireCurrentCmd 
+  V.EvKey V.KRight [] -> theList |> lzRight |> Select Safe |> continue
+  V.EvKey V.KLeft  [] -> theList |> lzLeft |> Select Safe |> continue
+  V.EvKey V.KEnter [] -> fireCurrentCmd theList
+  _ -> appCurrentCommand (handleListEvent ev) theList >>= Select trigger .> continue
+
+fireCurrentCmd :: LZipper
+                  (OkSection' (GenericList Text Seq (OkCommand' ParametrizableCommand)))
+                -> EventM n (Next ProgramState)
+fireCurrentCmd theList = 
     case lzCurrent theList |> commands |> listSelectedElement of
       Nothing -> halt Quit
       Just (_, OkCommand { bash = Disgressions _ _ }) ->
-        Select theList |> continue
-      Just (cmdPos, selection@OkCommand { bash = ACommand cmd }) ->
-        case arguments cmd of
-          [] ->
-            substituteNamedArgs [] cmd
-              |> Done (lzIndex theList, fromIntegral cmdPos)
-              |> halt
-          (x : xs) ->
-            (x :| xs)
-              |> mkEditor (lzIndex theList, fromIntegral cmdPos)
-                          selection { bash = cmd }
-              |> continue
-  _ -> appCurrentCommand (handleListEvent ev) theList >>= Select .> continue
+        Select Safe theList |> continue
+      Just (cmdPos, selection) ->
+         fireCommand theList cmdPos selection
 
+fireCommand
+  :: Integral a
+  => LZipper (OkSection' (GenericList Text Seq PerhapsRunnableCommand))
+  -> a
+  -> OkCommand' ParametrizableCommand
+  -> EventM n (Next ProgramState)
+fireCommand theList cmdPos selection = case bash selection of
+  Disgressions _ _ -> Select Safe theList |> continue
+  ACommand cmd     -> case arguments cmd of
+    [] ->
+      substituteNamedArgs [] cmd
+        |> Done (lzIndex theList, fromIntegral cmdPos)
+        |> halt
+    (x : xs) ->
+      (x :| xs)
+        |> mkEditor (lzIndex theList, fromIntegral cmdPos)
+                    selection { bash = cmd }
+        |> continue
 
 appCurrentCommand
   :: Monad m
@@ -247,7 +264,9 @@ handleEditor ev cmdPos cmd argDocs editors = case ev of
 
 -- <# STATE #> 
 
-data ProgramState = Select (LZipper (OkSection' (GenericList Text Seq.Seq
+data Trigger = Safe | Armed deriving (Show,Eq)
+
+data ProgramState = Select Trigger (LZipper (OkSection' (GenericList Text Seq.Seq
                                          PerhapsRunnableCommand)))
            | GetArgs CmdPos
                      (OkCommand' Unparametrized)
@@ -311,11 +330,11 @@ writeAuxiliaryFiles = do
   let
     toString = Dhall.declared .> Dhall.prettyExpr .> show
     sectionType =
-      (Dhall.inject :: Dhall.InputType (OkSection' [OkCommand' Text]))
+      (Dhall.inject :: Dhall.Encoder (OkSection' [OkCommand' Text]))
         |> toString
     commandType =
-      (Dhall.inject :: Dhall.InputType (OkCommand' Text)) |> toString
-    limitationType = (Dhall.inject :: Dhall.InputType Limitation) |> toString
+      (Dhall.inject :: Dhall.Encoder (OkCommand' Text)) |> toString
+    limitationType = (Dhall.inject :: Dhall.Encoder Limitation) |> toString
   onNonExistingConfig "OKSection.type"  (flip writeFile sectionType)
   onNonExistingConfig "OKCommand.type"  (flip writeFile commandType)
   onNonExistingConfig "Limitation.type" (flip writeFile limitationType)
@@ -417,7 +436,7 @@ main = do
   handler state (VtyEvent ev) = case ev of
     V.EvKey V.KEsc [] -> halt Quit
     _                 -> case state of
-      Select theList -> handleSelect theList ev
+      Select trigger theList -> handleSelect trigger theList ev
       --TODO: get last args
       GetArgs cmdPos cmd argDocs editors ->
         handleEditor ev cmdPos cmd argDocs editors
