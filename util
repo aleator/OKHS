@@ -1,0 +1,30 @@
+let 
+ Cmd = {Type    = ./OKCommand.type
+       ,default = {comment = "?", argDocs = [] : List {mapKey : Text,mapValue : Text},limitations = [] : List ./Limitation.type }}
+let 
+  Section = {Type = ./OKSection.type
+            ,default = {name = ".ok",documentation = None Text}
+            }
+in { 
+, OKHS = List ./OKSection.type
+, Cmd = Cmd
+, Section = Section
+, Limitation = ./Limitation.type
+, needsAFile = λ(file : Text) → (./Limitation.type).FileExists file
+, needsADirectory = λ(file : Text) → (./Limitation.type).FileExists file
+, cmd = λ(cmd : Text) → λ(comment : Text) → Cmd::{bash = cmd, comment = comment}
+, simple = λ(commands : List ./OKCommand.type) →
+            Section :: {name = "default", commands =  commands}
+, section =
+      λ(name : Text)
+    → λ(commands : List ./OKCommand.type)
+    → Section::{ name = name, commands = commands}
+
+, docs = 
+   λ(docs : Text) → 
+    {documentation = Some docs}
+
+, argDocs = 
+   λ(docs : List {mapKey : Text, mapValue : Text}) → 
+    {argDocs = docs}
+}
